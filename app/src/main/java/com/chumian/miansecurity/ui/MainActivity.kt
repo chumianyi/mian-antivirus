@@ -21,12 +21,14 @@ import com.chumian.miansecurity.service.ProtectService
 import com.chumian.miansecurity.update.UpdateChecker
 import com.chumian.miansecurity.util.FormatUtil
 import com.chumian.miansecurity.util.Prefs
+import rikka.shizuku.Shizuku
+import rikka.shizuku.Shizuku.OnRequestPermissionResultListener
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), OnRequestPermissionResultListener {
     private lateinit var binding: ActivityMainBinding
     private val scope = CoroutineScope(Dispatchers.Main)
 
@@ -36,9 +38,24 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         setupViews()
-        checkPermissionsAndMode()
+        detectCurrentMode()
         checkUpdateOnStart()
         updateStatus()
+    }
+
+    override fun onRequestPermissionResult(requestCode: Int, grantResult: Int) {
+        if (grantResult == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            runOnUiThread {
+                Toast.makeText(this, "Shizuku已授权，已切换到完整模式", Toast.LENGTH_LONG).show()
+                Prefs.currentMode = "shizuku"
+                Prefs.rootModeEnabled = false
+                updateStatus()
+            }
+        } else {
+            runOnUiThread {
+                Toast.makeText(this, "Shizuku授权被拒绝", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
     private fun setupViews() {
@@ -54,10 +71,32 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.cardEmergency.setOnClickListener {
+            if (!PermissionHelper.hasAccessibility(this) || !PermissionHelper.hasOverlay(this)) {
+                AlertDialog.Builder(this)
+                    .setTitle("需要权限")
+                    .setMessage("急救箱需要无障碍权限和悬浮窗权限才能正常工作。是否前往授权？")
+                    .setPositiveButton("去授权") { _, _ ->
+                        startActivity(Intent(this, PermissionGuideActivity::class.java))
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+                return@setOnClickListener
+            }
             startActivity(Intent(this, EmergencyActivity::class.java))
         }
 
         binding.cardProtect.setOnClickListener {
+            if (!PermissionHelper.hasAccessibility(this) || !PermissionHelper.hasOverlay(this)) {
+                AlertDialog.Builder(this)
+                    .setTitle("需要权限")
+                    .setMessage("安全防护需要无障碍权限和悬浮窗权限才能正常工作。是否前往授权？")
+                    .setPositiveButton("去授权") { _, _ ->
+                        startActivity(Intent(this, PermissionGuideActivity::class.java))
+                    }
+                    .setNegativeButton("取消", null)
+                    .show()
+                return@setOnClickListener
+            }
             startActivity(Intent(this, ProtectActivity::class.java))
         }
 
@@ -107,13 +146,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun checkPermissionsAndMode() {
-        val hasAcc = PermissionHelper.hasAccessibility(this)
-        val hasOv = PermissionHelper.hasOverlay(this)
-        val hasStorage = PermissionHelper.hasManageStorage(this)
+    private fun detectCurrentMode() {
+        // 按需授权：启动时不强制申请权限，只检测当前可用模式
+        val hasShizuku = try {
+            ShizukuHelper.isInstalled(this) && ShizukuHelper.isAvailable() && ShizukuHelper.isGranted()
+        } catch (e: Exception) { false }
 
-        if (!hasAcc || !hasOv) {
-            startActivity(Intent(this, PermissionGuideActivity::class.java))
+        val hasRoot = RootHelper.isRootAvailable()
+
+        // 如果当前模式是basic但Shizuku已授权，自动升级
+        if (Prefs.currentMode == "basic" && hasShizuku) {
+            Prefs.currentMode = "shizuku"
+        }
+        // 如果当前模式是force但Shizuku已授权，自动升级到shizuku
+        if (Prefs.currentMode == "force" && hasShizuku) {
+            Prefs.currentMode = "shizuku"
+        }
+        // 如果当前模式是root但root不可用，降级
+        if (Prefs.currentMode == "root" && !hasRoot) {
+            Prefs.currentMode = if (hasShizuku) "shizuku" else "basic"
+            Prefs.rootModeEnabled = false
         }
     }
 
@@ -305,8 +357,28 @@ class MainActivity : AppCompatActivity() {
         binding.tvVirusDb.text = "病毒库：${if (Prefs.virusDbLastUpdate > 0) FormatUtil.formatTime(Prefs.virusDbLastUpdate) else "未更新"}"
     }
 
+    override fun onStart() {
+        super.onStart()
+        try {
+            Shizuku.addRequestPermissionResultListener(this)
+        } catch (e: Exception) {
+            // Shizuku not available
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        try {
+            Shizuku.removeRequestPermissionResultListener(this)
+        } catch (e: Exception) {
+            // Shizuku not available
+        }
+    }
+
     override fun onResume() {
         super.onResume()
+        // 每次返回前台时检测Shizuku授权状态
+        detectCurrentMode()
         updateStatus()
     }
 }

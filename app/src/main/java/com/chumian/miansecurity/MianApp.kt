@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import androidx.appcompat.app.AppCompatDelegate
+import com.google.android.material.color.DynamicColors
 import com.chumian.miansecurity.util.Prefs
 
 class MianApp : Application() {
@@ -26,6 +27,8 @@ class MianApp : Application() {
         Prefs.init(this)
         createNotificationChannels()
         applyTheme()
+        // Android 12+ 动态取色
+        DynamicColors.applyToActivitiesIfAvailable(this)
     }
 
     private fun createNotificationChannels() {
