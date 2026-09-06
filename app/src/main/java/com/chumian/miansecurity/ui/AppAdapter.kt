@@ -29,19 +29,22 @@ class AppAdapter(
         val app = apps[position]
         holder.binding.tvAppName.text = app.appName
         holder.binding.tvPackageName.text = app.packageName
-        holder.binding.tvVersion.text = "v${app.versionName}"
-        holder.binding.tvSize.text = FormatUtil.formatFileSize(app.appSize)
-        holder.binding.ivIcon.setImageDrawable(app.icon)
 
-        holder.binding.tvStatus.text = when {
+        val status = when {
             app.isFrozen -> holder.binding.root.context.getString(R.string.frozen)
             app.isRunning -> holder.binding.root.context.getString(R.string.running)
             else -> holder.binding.root.context.getString(R.string.not_running)
         }
+        val systemTag = if (app.isSystemApp) " | 系统应用" else ""
+        holder.binding.tvAppInfo.text = "v${app.versionName} | ${FormatUtil.formatFileSize(app.appSize)} | $status$systemTag"
 
-        holder.binding.ivSystem.visibility = if (app.isSystemApp) View.VISIBLE else View.GONE
+        try {
+            holder.binding.ivIcon.setImageDrawable(app.icon)
+        } catch (e: Exception) {
+            holder.binding.ivIcon.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
 
-        holder.binding.btnMenu.setOnClickListener { v ->
+        holder.binding.ivMore.setOnClickListener { v ->
             val popup = PopupMenu(v.context, v)
             popup.menuInflater.inflate(R.menu.app_item_menu, popup.menu)
             popup.menu.findItem(R.id.action_freeze)?.title =

@@ -194,7 +194,7 @@ class ProtectService : Service(), SensorEventListener {
             val notification = NotificationCompat.Builder(this, MianApp.CHANNEL_VOLUME)
                 .setSmallIcon(R.drawable.ic_volume_off)
                 .setContentTitle("音量保护")
-                .setContentText("$packageName 因$reason被禁止")
+                .setContentText("$packageName 因${reason}被禁止")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .build()

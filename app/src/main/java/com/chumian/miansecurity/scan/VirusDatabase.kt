@@ -94,7 +94,7 @@ object VirusDatabase {
         else -> "恶意软件"
     }
 
-    private fun getRiskLevel(name: String): String = when {
+    fun getRiskLevel(name: String): String = when {
         name.contains("Ransomware") || name.contains("Backdoor") || name.contains("Spyware") -> "高风险"
         name.contains("Trojan") || name.contains("Worm") -> "高风险"
         name.contains("Miner") -> "中风险"
@@ -168,7 +168,7 @@ object VirusDatabase {
             val db = JSONObject()
             db.put("version", System.currentTimeMillis().toString())
             db.put("signatures", JSONObject(builtInSignatures.mapValues { it.value.joinToString(",") }))
-            db.writeText(db.toString())
+            dbFile.writeText(db.toString())
             Prefs.virusDbVersion = System.currentTimeMillis().toString()
             Prefs.virusDbLastUpdate = System.currentTimeMillis()
             true

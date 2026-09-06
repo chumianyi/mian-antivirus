@@ -25,10 +25,13 @@ class BatteryAppAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val app = apps[position]
         holder.binding.tvAppName.text = app.appName
-        holder.binding.tvPackageName.text = app.packageName
-        holder.binding.tvAppSize.text = FormatUtil.formatFileSize(app.appSize)
-        holder.binding.ivIcon.setImageDrawable(app.icon)
-        holder.binding.btnOptimize.setOnClickListener { onOptimize(app) }
+        holder.binding.tvUsage.text = "${app.packageName} | ${FormatUtil.formatFileSize(app.appSize)}"
+        try {
+            holder.binding.ivIcon.setImageDrawable(app.icon)
+        } catch (e: Exception) {
+            holder.binding.ivIcon.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
+        holder.binding.root.setOnClickListener { onOptimize(app) }
     }
 
     override fun getItemCount() = apps.size

@@ -26,11 +26,14 @@ class CacheAppAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val app = apps[position]
         holder.binding.tvAppName.text = app.appName
-        holder.binding.tvPackageName.text = app.packageName
-        holder.binding.tvCacheSize.text = FormatUtil.formatFileSize(app.cacheSize)
-        holder.binding.ivIcon.setImageDrawable(app.icon)
-        holder.binding.checkbox.isChecked = selected.contains(app.packageName)
-        holder.binding.checkbox.setOnCheckedChangeListener { _, isChecked ->
+        holder.binding.tvCacheSize.text = "${app.packageName} | 缓存: ${FormatUtil.formatFileSize(app.cacheSize)}"
+        try {
+            holder.binding.ivIcon.setImageDrawable(app.icon)
+        } catch (e: Exception) {
+            holder.binding.ivIcon.setImageResource(android.R.drawable.sym_def_app_icon)
+        }
+        holder.binding.checkBox.isChecked = selected.contains(app.packageName)
+        holder.binding.checkBox.setOnCheckedChangeListener { _, isChecked ->
             onCheckedChange(app.packageName, isChecked)
         }
     }
