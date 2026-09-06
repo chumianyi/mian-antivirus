@@ -83,7 +83,7 @@ object AppScanner {
             val dangerousPerms = allPerms.filter { it in DANGEROUS_PERMISSIONS }
 
             // 病毒库扫描
-            val virusMatches = virusDb.scanApp(pkg.packageName, appName, allPerms)
+            val virusMatches = virusDb.scanPackageName(pkg.packageName) + virusDb.scanAppName(appName)
 
             // 盗版检测
             val piracyInfo = checkPiracy(context, pkg.packageName, appName, allPerms, pkg.signatures)

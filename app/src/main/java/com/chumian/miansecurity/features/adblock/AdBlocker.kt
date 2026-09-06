@@ -23,7 +23,7 @@ class AdBlocker(private val context: Context) {
         const val HOSTS_BACKUP_PATH = "/data/local/tmp/hosts.mian.backup"
 
         // 超长免责声明
-        const val DISCLAIMER = """
+        val DISCLAIMER = """
 【广告拦截功能免责声明】
 
 请仔细阅读以下免责声明，勾选"我已阅读并同意"后方可使用广告拦截功能。

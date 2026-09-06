@@ -61,7 +61,10 @@ class EmergencyActivity : AppCompatActivity() {
                     processName = pkg,
                     packageName = pkg,
                     memorySize = 0,
-                    isSystem = false
+                    cpuPercent = 0f,
+                    isSystem = false,
+                    user = "",
+                    state = ""
                 )
             },
             onKill = {}

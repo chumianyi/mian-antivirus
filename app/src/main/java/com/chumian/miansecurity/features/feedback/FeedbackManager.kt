@@ -45,7 +45,7 @@ class FeedbackManager(private val context: Context) {
             val logFile = saveLogFile(feedbackInfo)
 
             val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "message/rfc822"
+                this.type = "message/rfc822"
                 putExtra(Intent.EXTRA_EMAIL, arrayOf(FEEDBACK_EMAIL))
                 putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, body)

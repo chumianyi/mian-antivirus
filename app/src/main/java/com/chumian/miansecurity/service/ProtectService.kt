@@ -131,7 +131,7 @@ class ProtectService : Service(), SensorEventListener {
         if (currentVolume == maxVolume && lastVolume < maxVolume - 2) {
             val foreground = ProcessManager.getForegroundPackage(this)
             if (foreground.isNotEmpty() && foreground != packageName) {
-                ProcessManager.killProcess(this, foreground)
+                ShizukuHelper.killProcess(foreground)
                 // 发送通知
                 val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
                 val notif = NotificationCompat.Builder(this, MianApp.CHANNEL_VOLUME)

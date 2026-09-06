@@ -205,7 +205,7 @@ object DeviceInfo {
             }
             val health = "良好"
             val technology = "Li-ion"
-            val voltage = batteryManager.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_VOLTAGE) / 1000f
+            val voltage = 0f
             val temperature = 0f
             SixTuple(level, status, health, technology, voltage, temperature)
         } catch (e: Exception) {

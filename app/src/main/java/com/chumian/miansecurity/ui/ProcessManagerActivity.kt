@@ -54,7 +54,7 @@ class ProcessManagerActivity : AppCompatActivity() {
             Toast.makeText(this, "已结束 ${proc.processName}", Toast.LENGTH_SHORT).show()
             loadProcesses()
         } else {
-            ProcessManager.killProcess(this, proc.packageName)
+            ShizukuHelper.killProcess(proc.packageName)
             Toast.makeText(this, "已尝试结束 ${proc.processName}", Toast.LENGTH_SHORT).show()
             loadProcesses()
         }
