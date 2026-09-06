@@ -18,6 +18,7 @@ import com.chumian.miansecurity.MianApp
 import com.chumian.miansecurity.R
 import com.chumian.miansecurity.core.Prefs
 import com.chumian.miansecurity.core.ProcessManager
+import com.chumian.miansecurity.core.ShizukuHelper
 import com.chumian.miansecurity.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
