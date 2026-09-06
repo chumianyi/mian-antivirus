@@ -5,6 +5,7 @@
     <color name="primary_light">#4DB6AC</color>
     <color name="accent">#00E5FF</color>
     <color name="danger">#FF5252</color>
+    <color name="danger_bg">#FFEBEE</color>
     <color name="warning">#FFB74D</color>
     <color name="success">#69F0AE</color>
     <color name="info">#40C4FF</color>

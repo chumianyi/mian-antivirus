@@ -416,7 +416,7 @@
                     <ImageView
                         android:layout_width="32dp"
                         android:layout_height="32dp"
-                        android:src="@android:drawable/ic_menu_battery" />
+                        android:src="@android:drawable/ic_menu_recent_history" />
 
                     <TextView
                         android:layout_width="match_parent"
