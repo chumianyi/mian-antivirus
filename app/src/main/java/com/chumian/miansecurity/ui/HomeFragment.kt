@@ -62,7 +62,7 @@ class HomeFragment : Fragment() {
         // 上次扫描
         if (Prefs.lastScanTime > 0) {
             val sdf = SimpleDateFormat("MM-dd HH:mm", Locale.getDefault())
-            binding.tvLastScan.text = "上次扫描：${sdf.format(Date(Prefs.lastScanTime))}，发现$dangerCount个风险"
+            binding.tvLastScan.text = "上次扫描：${sdf.format(Date(Prefs.lastScanTime))}，发现${Prefs.lastScanDangerCount}个风险"
         } else {
             binding.tvLastScan.text = "尚未扫描"
         }
@@ -91,7 +91,7 @@ class HomeFragment : Fragment() {
             startActivity(Intent(requireContext(), CacheCleanActivity::class.java))
         }
         binding.btnQuickScan.setOnClickListener {
-            (activity as? MainActivity)?.binding?.bottomNav?.selectedItemId = R.id.nav_scan
+            (activity as? MainActivity)?.switchToScanTab()
         }
     }
 

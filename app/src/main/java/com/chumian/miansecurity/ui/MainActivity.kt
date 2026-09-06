@@ -52,4 +52,8 @@ class MainActivity : AppCompatActivity() {
             .replace(R.id.fragmentContainer, fragment)
             .commit()
     }
+
+    fun switchToScanTab() {
+        binding.bottomNav.selectedItemId = R.id.nav_scan
+    }
 }
