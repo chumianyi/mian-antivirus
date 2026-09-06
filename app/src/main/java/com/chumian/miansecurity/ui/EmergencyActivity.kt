@@ -1,107 +1,73 @@
 package com.chumian.miansecurity.ui
 
-import android.app.AlertDialog
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.chumian.miansecurity.R
+import com.chumian.miansecurity.core.ProcessManager
+import com.chumian.miansecurity.core.ShizukuHelper
 import com.chumian.miansecurity.databinding.ActivityEmergencyBinding
-import com.chumian.miansecurity.emergency.ProcessManager
-import com.chumian.miansecurity.permission.PermissionHelper
-import com.chumian.miansecurity.util.Prefs
+import com.chumian.miansecurity.ui.adapter.ProcessAdapter
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class EmergencyActivity : AppCompatActivity() {
     private lateinit var binding: ActivityEmergencyBinding
-    private val killedProcesses = mutableListOf<String>()
-    private lateinit var adapter: KilledProcessAdapter
+    private val scope = CoroutineScope(Dispatchers.Main)
+    private var killedProcesses: List<String> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityEmergencyBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupToolbar()
-        setupRecyclerView()
-        setupButtons()
-    }
-
-    private fun setupToolbar() {
-        binding.toolbar.title = getString(R.string.emergency_box)
+        binding.toolbar.title = "急救箱"
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener { finish() }
-    }
 
-    private fun setupRecyclerView() {
-        adapter = KilledProcessAdapter(killedProcesses)
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.adapter = adapter
-    }
-
-    private fun setupButtons() {
-        binding.btnStartEmergency.setOnClickListener {
-            showEmergencyConfirm()
-        }
-    }
-
-    private fun showEmergencyConfirm() {
-        if (!PermissionHelper.hasAccessibility(this) || !PermissionHelper.hasOverlay(this)) {
-            Toast.makeText(this, "需要无障碍和悬浮窗权限", Toast.LENGTH_SHORT).show()
-            startActivity(android.content.Intent(this, PermissionGuideActivity::class.java))
-            return
-        }
-
-        AlertDialog.Builder(this)
-            .setTitle(R.string.warning)
-            .setMessage(R.string.emergency_warning)
-            .setPositiveButton(R.string.confirm) { _, _ ->
-                startEmergency()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+        binding.btnStartEmergency.setOnClickListener { startEmergency() }
     }
 
     private fun startEmergency() {
-        killedProcesses.clear()
-        adapter.notifyDataSetChanged()
-        binding.progressLayout.visibility = View.VISIBLE
-        binding.resultLayout.visibility = View.GONE
+        binding.progressBar.visibility = View.VISIBLE
+        binding.tvStatus.text = "正在强扫系统并清除进程..."
         binding.btnStartEmergency.isEnabled = false
-        binding.btnStartEmergency.text = getString(R.string.emergency_running)
 
-        lifecycleScope.launch {
-            binding.tvStatus.text = getString(R.string.force_scan)
-            // 快速扫描
-            val scanResults = withContext(Dispatchers.IO) {
-                try {
-                    val apps = ProcessManager.getInstalledApps(this@EmergencyActivity)
-                    apps.filter { !it.isSystemApp }.take(20)
-                } catch (e: Exception) {
-                    emptyList()
-                }
-            }
-
-            binding.tvStatus.text = getString(R.string.clear_background)
-            val killed = withContext(Dispatchers.IO) {
+        scope.launch {
+            killedProcesses = withContext(Dispatchers.IO) {
                 ProcessManager.killAllProcesses(this@EmergencyActivity)
             }
-
-            killedProcesses.addAll(killed)
-            adapter.notifyDataSetChanged()
-
-            binding.progressLayout.visibility = View.GONE
-            binding.resultLayout.visibility = View.VISIBLE
-            binding.btnStartEmergency.isEnabled = true
-            binding.btnStartEmergency.text = getString(R.string.start_emergency)
-            binding.tvKilledCount.text = "已禁止 ${killedProcesses.size} 个进程"
-
-            Toast.makeText(this@EmergencyActivity, R.string.emergency_complete, Toast.LENGTH_SHORT).show()
+            withContext(Dispatchers.Main) {
+                binding.progressBar.visibility = View.GONE
+                binding.btnStartEmergency.isEnabled = true
+                binding.tvStatus.text = "急救完成！已禁止 ${killedProcesses.size} 个进程"
+                showKilledProcesses()
+                Toast.makeText(this@EmergencyActivity, "急救箱执行完毕", Toast.LENGTH_SHORT).show()
+            }
         }
+    }
+
+    private fun showKilledProcesses() {
+        binding.killedListLayout.visibility = View.VISIBLE
+        binding.tvKilledCount.text = "已禁止的进程（${killedProcesses.size}）："
+        val adapter = ProcessAdapter(
+            processes = killedProcesses.map { pkg ->
+                com.chumian.miansecurity.model.ProcessInfo(
+                    pid = 0,
+                    processName = pkg,
+                    packageName = pkg,
+                    memorySize = 0,
+                    isSystem = false
+                )
+            },
+            onKill = {}
+        )
+        // 隐藏kill按钮，用简单列表
+        binding.recyclerViewKilled.layoutManager = LinearLayoutManager(this)
+        binding.recyclerViewKilled.adapter = adapter
     }
 }

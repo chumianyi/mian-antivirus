@@ -11,29 +11,153 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.media.AudioManager
 import android.os.Build
-import android.os.Handler
 import android.os.IBinder
-import android.os.Looper
-import android.os.VibrationEffect
-import android.os.Vibrator
 import android.view.KeyEvent
 import androidx.core.app.NotificationCompat
 import com.chumian.miansecurity.MianApp
 import com.chumian.miansecurity.R
-import com.chumian.miansecurity.emergency.ProcessManager
+import com.chumian.miansecurity.core.Prefs
+import com.chumian.miansecurity.core.ProcessManager
 import com.chumian.miansecurity.ui.MainActivity
-import com.chumian.miansecurity.util.Prefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ProtectService : Service(), SensorEventListener {
+    private val scope = CoroutineScope(Dispatchers.Main)
+    private var sensorManager: SensorManager? = null
+    private var audioManager: AudioManager? = null
+    private var lastVolume = 0
+    private var volumeKeySequence = mutableListOf<Int>()
+    private var lastShakeTime = 0L
+    private var shakeCount = 0
+
+    override fun onCreate() {
+        super.onCreate()
+        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        lastVolume = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+        startForeground(NOTIFICATION_ID, buildNotification())
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_KILL_ALL -> killAllProcesses()
+            ACTION_STOP -> stopSelf()
+        }
+        return START_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun buildNotification(): Notification {
+        val intent = Intent(this, MainActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(this, 0, intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+        val killIntent = Intent(this, ProtectService::class.java).apply { action = ACTION_KILL_ALL }
+        val killPendingIntent = PendingIntent.getService(this, 1, killIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+
+        return NotificationCompat.Builder(this, MianApp.CHANNEL_PROTECT)
+            .setSmallIcon(R.drawable.ic_shield)
+            .setContentTitle("眠. 实时守护")
+            .setContentText("守护运行中，点击禁止所有进程")
+            .setContentIntent(pendingIntent)
+            .addAction(R.drawable.ic_stop, "禁止所有进程", killPendingIntent)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+    }
+
+    private fun killAllProcesses() {
+        scope.launch {
+            val killed = ProcessManager.killAllProcesses(this@ProtectService)
+            // 发送通知
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+            val notif = NotificationCompat.Builder(this@ProtectService, MianApp.CHANNEL_EMERGENCY)
+                .setSmallIcon(R.drawable.ic_shield)
+                .setContentTitle("急救完成")
+                .setContentText("已禁止 ${killed.size} 个进程")
+                .setAutoCancel(true)
+                .build()
+            nm.notify(2002, notif)
+        }
+    }
+
+    // 音量键序列检测：上-下下-上上
+    fun onVolumeKey(keyCode: Int) {
+        if (Prefs.protectMethod != "volume") return
+        volumeKeySequence.add(keyCode)
+        if (volumeKeySequence.size > 5) volumeKeySequence.removeAt(0)
+        // 检测序列：上(24)-下(25)-下(25)-上(24)-上(24)
+        val target = listOf(24, 25, 25, 24, 24)
+        if (volumeKeySequence.size == 5 && volumeKeySequence == target) {
+            killAllProcesses()
+            volumeKeySequence.clear()
+        }
+    }
+
+    // 摇晃检测
+    override fun onSensorChanged(event: SensorEvent?) {
+        if (Prefs.protectMethod != "shake") return
+        event ?: return
+        if (event.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+            val x = event.values[0]
+            val y = event.values[1]
+            val z = event.values[2]
+            val acceleration = Math.sqrt((x*x + y*y + z*z).toDouble())
+            if (acceleration > 25.0) {
+                val now = System.currentTimeMillis()
+                if (now - lastShakeTime > 100) {
+                    shakeCount++
+                    lastShakeTime = now
+                    if (shakeCount >= 3) {
+                        killAllProcesses()
+                        shakeCount = 0
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+
+    // 音量保护
+    fun checkVolumeProtection() {
+        if (!Prefs.volumeProtectEnabled) return
+        val currentVolume = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+        val maxVolume = audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 15
+        // 如果音量突然拉满
+        if (currentVolume == maxVolume && lastVolume < maxVolume - 2) {
+            val foreground = ProcessManager.getForegroundPackage(this)
+            if (foreground.isNotEmpty() && foreground != packageName) {
+                ProcessManager.killProcess(this, foreground)
+                // 发送通知
+                val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
+                val notif = NotificationCompat.Builder(this, MianApp.CHANNEL_VOLUME)
+                    .setSmallIcon(R.drawable.ic_volume_off)
+                    .setContentTitle("音量保护")
+                    .setContentText("$foreground 因强制拉满音量被禁止")
+                    .setAutoCancel(true)
+                    .build()
+                nm.notify(2001, notif)
+            }
+        }
+        lastVolume = currentVolume
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        sensorManager?.unregisterListener(this)
+    }
+
     companion object {
+        const val NOTIFICATION_ID = 1001
         const val ACTION_KILL_ALL = "com.chumian.miansecurity.KILL_ALL"
-        const val ACTION_START = "com.chumian.miansecurity.START_PROTECT"
-        const val ACTION_STOP = "com.chumian.miansecurity.STOP_PROTECT"
-        private const val NOTIFICATION_ID = 1001
+        const val ACTION_STOP = "com.chumian.miansecurity.STOP"
 
         fun start(context: Context) {
             val intent = Intent(context, ProtectService::class.java)
-            intent.action = ACTION_START
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -42,274 +166,7 @@ class ProtectService : Service(), SensorEventListener {
         }
 
         fun stop(context: Context) {
-            val intent = Intent(context, ProtectService::class.java)
-            intent.action = ACTION_STOP
-            context.startService(intent)
+            context.stopService(Intent(context, ProtectService::class.java))
         }
     }
-
-    private lateinit var sensorManager: SensorManager
-    private var accelerometer: Sensor? = null
-    private var lastShakeTime = 0L
-    private var shakeCount = 0
-
-    private var volumeKeySequence = mutableListOf<Int>()
-    private var lastVolumeKeyTime = 0L
-    private val handler = Handler(Looper.getMainLooper())
-
-    private var lastMediaVolume = -1
-    private var lastRingVolume = -1
-    private lateinit var audioManager: AudioManager
-
-    override fun onCreate() {
-        super.onCreate()
-        sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    }
-
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            ACTION_KILL_ALL -> {
-                executeKillAll()
-                return START_STICKY
-            }
-            ACTION_STOP -> {
-                stopSelf()
-                return START_NOT_STICKY
-            }
-            "VOLUME_KEY" -> {
-                val keyCode = intent.getIntExtra("keyCode", 0)
-                if (keyCode != 0) {
-                    onVolumeKeyPressed(keyCode)
-                }
-                return START_STICKY
-            }
-        }
-
-        startForeground(NOTIFICATION_ID, buildNotification())
-        registerSensors()
-        startVolumeMonitoring()
-        Prefs.protectEnabled = true
-
-        return START_STICKY
-    }
-
-    private fun buildNotification(): Notification {
-        val intent = Intent(this, MainActivity::class.java)
-        val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val killIntent = Intent(this, ProtectService::class.java)
-        killIntent.action = ACTION_KILL_ALL
-        val killPendingIntent = PendingIntent.getService(
-            this, 1, killIntent,
-            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val builder = NotificationCompat.Builder(this, MianApp.CHANNEL_PROTECT)
-            .setSmallIcon(R.drawable.ic_shield)
-            .setContentTitle(getString(R.string.protect_notification_title))
-            .setContentText(getString(R.string.protect_notification_text))
-            .setContentIntent(pendingIntent)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(
-                R.drawable.ic_stop,
-                getString(R.string.action_kill_all),
-                killPendingIntent
-            )
-
-        return builder.build()
-    }
-
-    private fun registerSensors() {
-        if (Prefs.protectMethodShake) {
-            accelerometer?.let {
-                sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
-            }
-        }
-    }
-
-    private fun startVolumeMonitoring() {
-        if (Prefs.volumeProtectEnabled) {
-            lastMediaVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            lastRingVolume = audioManager.getStreamVolume(AudioManager.STREAM_RING)
-            handler.post(volumeMonitorRunnable)
-        }
-    }
-
-    private val volumeMonitorRunnable = object : Runnable {
-        override fun run() {
-            checkVolumeChanges()
-            handler.postDelayed(this, 500)
-        }
-    }
-
-    private fun checkVolumeChanges() {
-        try {
-            val maxMedia = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-            val maxRing = audioManager.getStreamMaxVolume(AudioManager.STREAM_RING)
-            val currentMedia = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
-            val currentRing = audioManager.getStreamVolume(AudioManager.STREAM_RING)
-
-            if (lastMediaVolume >= 0 && currentMedia == maxMedia && lastMediaVolume != maxMedia) {
-                val foreground = ProcessManager.getForegroundPackage(this)
-                if (foreground.isNotEmpty() && foreground != packageName) {
-                    handleVolumeViolation(foreground, "媒体音量被拉满")
-                }
-            }
-
-            if (lastRingVolume >= 0 && currentRing == maxRing && lastRingVolume != maxRing) {
-                val foreground = ProcessManager.getForegroundPackage(this)
-                if (foreground.isNotEmpty() && foreground != packageName) {
-                    handleVolumeViolation(foreground, "铃声音量被拉满")
-                }
-            }
-
-            lastMediaVolume = currentMedia
-            lastRingVolume = currentRing
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun handleVolumeViolation(packageName: String, reason: String) {
-        Prefs.volumeViolationCount = Prefs.volumeViolationCount + 1
-        Prefs.lastVolumeViolation = "$packageName - $reason"
-
-        ProcessManager.forceStopProcess(this, packageName)
-
-        if (Prefs.vibrateOnTrigger) {
-            vibrate()
-        }
-
-        sendVolumeViolationNotification(packageName, reason)
-    }
-
-    private fun sendVolumeViolationNotification(packageName: String, reason: String) {
-        try {
-            val notification = NotificationCompat.Builder(this, MianApp.CHANNEL_VOLUME)
-                .setSmallIcon(R.drawable.ic_volume_off)
-                .setContentTitle("音量保护")
-                .setContentText("$packageName 因${reason}被禁止")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .build()
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            nm.notify(2001, notification)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    fun onVolumeKeyPressed(keyCode: Int) {
-        if (!Prefs.protectMethodVolume) return
-
-        val now = System.currentTimeMillis()
-        if (now - lastVolumeKeyTime > 2000) {
-            volumeKeySequence.clear()
-        }
-        lastVolumeKeyTime = now
-
-        volumeKeySequence.add(keyCode)
-        if (volumeKeySequence.size > 5) {
-            volumeKeySequence.removeAt(0)
-        }
-
-        if (checkVolumeSequence()) {
-            volumeKeySequence.clear()
-            executeKillAll()
-        }
-    }
-
-    private fun checkVolumeSequence(): Boolean {
-        if (volumeKeySequence.size != 5) return false
-        return volumeKeySequence[0] == KeyEvent.KEYCODE_VOLUME_UP &&
-                volumeKeySequence[1] == KeyEvent.KEYCODE_VOLUME_DOWN &&
-                volumeKeySequence[2] == KeyEvent.KEYCODE_VOLUME_DOWN &&
-                volumeKeySequence[3] == KeyEvent.KEYCODE_VOLUME_UP &&
-                volumeKeySequence[4] == KeyEvent.KEYCODE_VOLUME_UP
-    }
-
-    override fun onSensorChanged(event: SensorEvent?) {
-        if (!Prefs.protectMethodShake) return
-        if (event?.sensor?.type != Sensor.TYPE_ACCELEROMETER) return
-
-        val x = event.values[0]
-        val y = event.values[1]
-        val z = event.values[2]
-
-        val acceleration = Math.sqrt((x * x + y * y + z * z).toDouble())
-        val threshold = 25.0
-
-        if (acceleration > threshold) {
-            val now = System.currentTimeMillis()
-            if (now - lastShakeTime > 100) {
-                shakeCount++
-                lastShakeTime = now
-                if (shakeCount >= 3) {
-                    shakeCount = 0
-                    executeKillAll()
-                }
-            }
-        }
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-
-    private fun executeKillAll() {
-        Thread {
-            try {
-                val killed = ProcessManager.killAllAndRemoveForeground(this)
-                if (Prefs.vibrateOnTrigger) {
-                    vibrate()
-                }
-                showKillResultNotification(killed.size)
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
-    }
-
-    private fun showKillResultNotification(count: Int) {
-        try {
-            val notification = NotificationCompat.Builder(this, MianApp.CHANNEL_PROTECT)
-                .setSmallIcon(R.drawable.ic_shield)
-                .setContentTitle("实时守护")
-                .setContentText("已禁止 $count 个进程")
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setAutoCancel(true)
-                .build()
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
-            nm.notify(1002, notification)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun vibrate() {
-        try {
-            val vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(200)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        sensorManager.unregisterListener(this)
-        handler.removeCallbacks(volumeMonitorRunnable)
-        Prefs.protectEnabled = false
-    }
-
-    override fun onBind(intent: Intent?): IBinder? = null
 }

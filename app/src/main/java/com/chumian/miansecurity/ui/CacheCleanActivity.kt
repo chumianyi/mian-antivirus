@@ -1,104 +1,91 @@
 package com.chumian.miansecurity.ui
 
-import android.app.AlertDialog
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.LinearLayoutManager
-import com.chumian.miansecurity.R
+import com.chumian.miansecurity.core.ShizukuHelper
 import com.chumian.miansecurity.databinding.ActivityCacheCleanBinding
-import com.chumian.miansecurity.emergency.ProcessManager
-import com.chumian.miansecurity.model.AppInfo
-import com.chumian.miansecurity.util.FormatUtil
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 
 class CacheCleanActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCacheCleanBinding
-    private val apps = mutableListOf<AppInfo>()
-    private val selected = mutableSetOf<String>()
-    private lateinit var adapter: CacheAppAdapter
+    private val scope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityCacheCleanBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupToolbar()
-        setupRecyclerView()
-        setupButtons()
-        scanCache()
-    }
-
-    private fun setupToolbar() {
-        binding.toolbar.title = getString(R.string.cache_clean)
+        binding.toolbar.title = "缓存清理"
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener { finish() }
+
+        calculateCache()
+        binding.btnClean.setOnClickListener { cleanCache() }
     }
 
-    private fun setupRecyclerView() {
-        adapter = CacheAppAdapter(apps, selected) { pkg, isChecked ->
-            if (isChecked) selected.add(pkg) else selected.remove(pkg)
-            updateSummary()
-        }
-        binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.adapter = adapter
-    }
-
-    private fun setupButtons() {
-        binding.btnSelectAll.setOnClickListener {
-            if (selected.size == apps.size) {
-                selected.clear()
-            } else {
-                selected.addAll(apps.map { it.packageName })
-            }
-            adapter.notifyDataSetChanged()
-            updateSummary()
-        }
-        binding.btnClean.setOnClickListener { cleanSelected() }
-    }
-
-    private fun scanCache() {
+    private fun calculateCache() {
         binding.progressBar.visibility = android.view.View.VISIBLE
-        binding.tvStatus.text = "正在扫描缓存..."
-        lifecycleScope.launch {
-            val allApps = withContext(Dispatchers.IO) {
-                ProcessManager.getInstalledApps(this@CacheCleanActivity)
+        scope.launch {
+            val cacheSize = withContext(Dispatchers.IO) {
+                var total = 0L
+                try {
+                    // 计算应用缓存
+                    val externalCache = getExternalFilesDir(null)?.parentFile?.listFiles()
+                    externalCache?.forEach { dir ->
+                        if (dir.name == "cache") {
+                            total += dir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                        }
+                    }
+                    // 系统缓存
+                    val cacheDir = cacheDir
+                    total += cacheDir.walkTopDown().filter { it.isFile }.sumOf { it.length() }
+                } catch (e: Exception) {}
+                total
             }
-            apps.clear()
-            apps.addAll(allApps.filter { it.cacheSize > 0 }.sortedByDescending { it.cacheSize })
-            adapter.notifyDataSetChanged()
             binding.progressBar.visibility = android.view.View.GONE
-            binding.tvStatus.text = "扫描完成"
-            updateSummary()
+            binding.tvCacheSize.text = formatSize(cacheSize)
+            binding.tvCacheDesc.text = "可清理缓存空间"
         }
     }
 
-    private fun updateSummary() {
-        val totalCache = apps.sumOf { it.cacheSize }
-        val selectedCache = apps.filter { selected.contains(it.packageName) }.sumOf { it.cacheSize }
-        binding.tvTotalCache.text = "总缓存：${FormatUtil.formatFileSize(totalCache)}"
-        binding.tvSelectedCache.text = "已选：${FormatUtil.formatFileSize(selectedCache)} (${selected.size}项)"
-        binding.btnClean.isEnabled = selected.isNotEmpty()
+    private fun cleanCache() {
+        binding.progressBar.visibility = android.view.View.VISIBLE
+        binding.tvCacheDesc.text = "正在清理..."
+        scope.launch {
+            val cleaned = withContext(Dispatchers.IO) {
+                var freed = 0L
+                try {
+                    // 清理应用缓存
+                    cacheDir.walkTopDown().filter { it.isFile }.forEach {
+                        freed += it.length()
+                        it.delete()
+                    }
+                    // 用Shizuku清理系统缓存
+                    if (ShizukuHelper.isGranted()) {
+                        ShizukuHelper.clearCache(packageName)
+                    }
+                } catch (e: Exception) {}
+                freed
+            }
+            binding.progressBar.visibility = android.view.View.GONE
+            binding.tvCacheSize.text = formatSize(0)
+            binding.tvCacheDesc.text = "清理完成，释放 ${formatSize(cleaned)}"
+            Toast.makeText(this@CacheCleanActivity, "缓存清理完成", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun cleanSelected() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.warning)
-            .setMessage("确定清理选中的 ${selected.size} 个应用缓存？")
-            .setPositiveButton(R.string.confirm) { _, _ ->
-                var cleaned = 0
-                for (pkg in selected) {
-                    if (ProcessManager.clearAppCache(this, pkg)) cleaned++
-                }
-                Toast.makeText(this, "已清理 $cleaned 个应用缓存", Toast.LENGTH_SHORT).show()
-                selected.clear()
-                scanCache()
-            }
-            .setNegativeButton(R.string.cancel, null)
-            .show()
+    private fun formatSize(bytes: Long): String {
+        if (bytes <= 0) return "0 B"
+        val units = arrayOf("B", "KB", "MB", "GB")
+        val digitGroups = (Math.log10(bytes.toDouble()) / Math.log10(1024.0)).toInt()
+        val index = minOf(digitGroups, units.size - 1)
+        val value = bytes / Math.pow(1024.0, index.toDouble())
+        return String.format("%.2f %s", value, units[index])
     }
 }

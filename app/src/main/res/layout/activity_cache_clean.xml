@@ -1,101 +1,48 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:padding="24dp">
 
     <com.google.android.material.appbar.MaterialToolbar
         android:id="@+id/toolbar"
         android:layout_width="match_parent"
         android:layout_height="?attr/actionBarSize"
-        android:background="?attr/colorPrimary"
-        app:titleTextColor="@android:color/white"
-        app:navigationIconTint="@android:color/white" />
+        android:background="?attr/colorPrimary" />
 
-    <com.google.android.material.card.MaterialCardView
+    <TextView
+        android:id="@+id/tvCacheSize"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0 MB"
+        android:textSize="48sp"
+        android:textStyle="bold"
+        android:layout_marginTop="48dp" />
+
+    <TextView
+        android:id="@+id/tvCacheDesc"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="可清理缓存空间"
+        android:textSize="14sp"
+        android:layout_marginTop="8dp" />
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        style="?android:attr/progressBarStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="24dp"
+        android:visibility="gone" />
+
+    <Button
+        android:id="@+id/btnClean"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="12dp"
-        app:cardCornerRadius="12dp"
-        app:cardElevation="2dp">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
-
-            <TextView
-                android:id="@+id/tv_total_cache"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="总缓存：0 B"
-                android:textSize="16sp"
-                android:textStyle="bold" />
-
-            <TextView
-                android:id="@+id/tv_selected_cache"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="已选：0 B (0项)"
-                android:textSize="13sp"
-                android:textColor="?android:attr/textColorSecondary"
-                android:layout_marginTop="4dp" />
-
-            <TextView
-                android:id="@+id/tv_status"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text=""
-                android:textSize="13sp"
-                android:layout_marginTop="4dp" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="12dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_select_all"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/select_all"
-                    android:layout_marginEnd="4dp"
-                    app:cornerRadius="8dp"
-                    style="@style/Widget.Material3.Button.OutlinedButton" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btn_clean"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="@string/clean_selected"
-                    android:layout_marginStart="4dp"
-                    app:cornerRadius="8dp"
-                    android:enabled="false" />
-            </LinearLayout>
-        </LinearLayout>
-    </com.google.android.material.card.MaterialCardView>
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent">
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:clipToPadding="false"
-            android:padding="8dp" />
-
-        <ProgressBar
-            android:id="@+id/progress_bar"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="center"
-            android:visibility="gone" />
-    </FrameLayout>
+        android:text="一键清理"
+        android:textSize="18sp"
+        android:padding="16dp"
+        android:layout_marginTop="32dp" />
 </LinearLayout>

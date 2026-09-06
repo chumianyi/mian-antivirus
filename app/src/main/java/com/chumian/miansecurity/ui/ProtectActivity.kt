@@ -4,121 +4,114 @@ import android.app.AlertDialog
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import com.chumian.miansecurity.R
+import com.chumian.miansecurity.core.Prefs
+import com.chumian.miansecurity.core.ProcessManager
+import com.chumian.miansecurity.core.ShizukuHelper
 import com.chumian.miansecurity.databinding.ActivityProtectBinding
-import com.chumian.miansecurity.permission.PermissionHelper
-import com.chumian.miansecurity.service.ProtectService
-import com.chumian.miansecurity.util.Prefs
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class ProtectActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProtectBinding
+    private val scope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityProtectBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupToolbar()
-        setupSwitches()
-        updateStatus()
-    }
-
-    private fun setupToolbar() {
-        binding.toolbar.title = getString(R.string.security_protect)
+        binding.toolbar.title = "安全防护"
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener { finish() }
+
+        updateUI()
+        setupClicks()
     }
 
-    private fun setupSwitches() {
+    private fun updateUI() {
+        binding.switchProtect.isChecked = Prefs.protectEnabled
+        binding.tvProtectStatus.text = if (Prefs.protectEnabled) "实时守护：运行中" else "实时守护：已关闭"
+
+        when (Prefs.protectMethod) {
+            "notification" -> binding.radioNotification.isChecked = true
+            "volume" -> binding.radioVolume.isChecked = true
+            "shake" -> binding.radioShake.isChecked = true
+        }
+
+        binding.switchVolumeProtect.isChecked = Prefs.volumeProtectEnabled
+    }
+
+    private fun setupClicks() {
         binding.switchProtect.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked) {
-                showProtectWarning()
+                AlertDialog.Builder(this)
+                    .setTitle("警告")
+                    .setMessage("实时守护功能日常情况下不建议开启，可能会影响系统稳定性。确定开启吗？")
+                    .setPositiveButton("确定开启") { _, _ ->
+                        Prefs.protectEnabled = true
+                        startProtectService()
+                        updateUI()
+                        Toast.makeText(this, "实时守护已开启", Toast.LENGTH_SHORT).show()
+                    }
+                    .setNegativeButton("取消") { _, _ ->
+                        binding.switchProtect.isChecked = false
+                    }
+                    .show()
             } else {
-                ProtectService.stop(this)
-                updateStatus()
+                Prefs.protectEnabled = false
+                stopProtectService()
+                updateUI()
+                Toast.makeText(this, "实时守护已关闭", Toast.LENGTH_SHORT).show()
             }
         }
 
-        binding.switchMethodNotification.setOnCheckedChangeListener { _, isChecked ->
-            Prefs.protectMethodNotification = isChecked
-        }
-
-        binding.switchMethodVolume.setOnCheckedChangeListener { _, isChecked ->
-            Prefs.protectMethodVolume = isChecked
-            if (isChecked && !PermissionHelper.hasAccessibility(this)) {
-                Toast.makeText(this, "需要无障碍权限才能监听音量键", Toast.LENGTH_SHORT).show()
+        binding.radioGroupMethod.setOnCheckedChangeListener { _, checkedId ->
+            Prefs.protectMethod = when (checkedId) {
+                binding.radioVolume.id -> "volume"
+                binding.radioShake.id -> "shake"
+                else -> "notification"
             }
-        }
-
-        binding.switchMethodShake.setOnCheckedChangeListener { _, isChecked ->
-            Prefs.protectMethodShake = isChecked
         }
 
         binding.switchVolumeProtect.setOnCheckedChangeListener { _, isChecked ->
             Prefs.volumeProtectEnabled = isChecked
-            if (isChecked && !Prefs.protectEnabled) {
-                Toast.makeText(this, "需要先启动实时守护", Toast.LENGTH_SHORT).show()
-                binding.switchVolumeProtect.isChecked = false
-                Prefs.volumeProtectEnabled = false
-            }
+            Toast.makeText(this, if (isChecked) "音量保护已开启" else "音量保护已关闭", Toast.LENGTH_SHORT).show()
         }
 
-        binding.switchVibrate.setOnCheckedChangeListener { _, isChecked ->
-            Prefs.vibrateOnTrigger = isChecked
-        }
-
-        binding.switchAutoStart.setOnCheckedChangeListener { _, isChecked ->
-            Prefs.autoStartProtect = isChecked
-        }
-    }
-
-    private fun showProtectWarning() {
-        AlertDialog.Builder(this)
-            .setTitle(R.string.warning)
-            .setMessage(R.string.protect_warning_detail)
-            .setPositiveButton(R.string.confirm) { _, _ ->
-                if (!PermissionHelper.hasAccessibility(this)) {
-                    PermissionHelper.requestAccessibility(this)
-                    binding.switchProtect.isChecked = false
-                    return@setPositiveButton
+        binding.btnKillAll.setOnClickListener {
+            AlertDialog.Builder(this)
+                .setTitle("禁止所有进程")
+                .setMessage("将强制停止所有非系统进程，确定继续吗？")
+                .setPositiveButton("确定") { _, _ ->
+                    scope.launch {
+                        val killed = ProcessManager.killAllProcesses(this@ProtectActivity)
+                        Toast.makeText(this@ProtectActivity, "已禁止 ${killed.size} 个进程", Toast.LENGTH_SHORT).show()
+                    }
                 }
-                if (!PermissionHelper.hasOverlay(this)) {
-                    PermissionHelper.requestOverlay(this)
-                    binding.switchProtect.isChecked = false
-                    return@setPositiveButton
-                }
-                ProtectService.start(this)
-                updateStatus()
-                Toast.makeText(this, "实时守护已启动", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(R.string.cancel) { _, _ ->
-                binding.switchProtect.isChecked = false
-            }
-            .show()
-    }
-
-    private fun updateStatus() {
-        val running = Prefs.protectEnabled
-        binding.switchProtect.isChecked = running
-        binding.tvStatus.text = if (running) getString(R.string.protect_running) else getString(R.string.protect_stopped)
-
-        binding.switchMethodNotification.isChecked = Prefs.protectMethodNotification
-        binding.switchMethodVolume.isChecked = Prefs.protectMethodVolume
-        binding.switchMethodShake.isChecked = Prefs.protectMethodShake
-        binding.switchVolumeProtect.isChecked = Prefs.volumeProtectEnabled
-        binding.switchVibrate.isChecked = Prefs.vibrateOnTrigger
-        binding.switchAutoStart.isChecked = Prefs.autoStartProtect
-
-        if (Prefs.volumeViolationCount > 0) {
-            binding.tvViolationInfo.text = "违规次数：${Prefs.volumeViolationCount}\n上次：${Prefs.lastVolumeViolation}"
-        } else {
-            binding.tvViolationInfo.text = getString(R.string.no_violation)
+                .setNegativeButton("取消", null)
+                .show()
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        updateStatus()
+    private fun startProtectService() {
+        // 启动前台服务
+        try {
+            val intent = android.content.Intent(this, com.chumian.miansecurity.service.ProtectService::class.java)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                startForegroundService(intent)
+            } else {
+                startService(intent)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun stopProtectService() {
+        try {
+            stopService(android.content.Intent(this, com.chumian.miansecurity.service.ProtectService::class.java))
+        } catch (e: Exception) {}
     }
 }

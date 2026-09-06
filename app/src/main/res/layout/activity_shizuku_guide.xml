@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center_horizontal">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@android:drawable/ic_menu_view"
+            android:layout_marginTop="32dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="眠. 杀毒软件"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="需要 Shizuku 授权才能使用核心功能"
+            android:textSize="14sp"
+            android:layout_marginTop="8dp" />
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            xmlns:app="http://schemas.android.com/apk/res-auto">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:id="@+id/tvStatusInstall"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✗ 未安装"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvStatusRunning"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✗ 未运行"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/tvStatusGranted"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="✗ 未授权"
+                    android:textSize="16sp" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <Button
+            android:id="@+id/btnInstallShizuku"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1. 安装 Shizuku"
+            android:layout_marginTop="24dp" />
+
+        <Button
+            android:id="@+id/btnStartShizuku"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="2. 启动 Shizuku 服务"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnAuthorize"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="3. 授权 Shizuku"
+            android:layout_marginTop="8dp" />
+
+        <Button
+            android:id="@+id/btnCheckAgain"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="重新检测"
+            android:layout_marginTop="16dp" />
+
+    </LinearLayout>
+</ScrollView>

@@ -4,164 +4,140 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.view.Menu
-import android.view.MenuItem
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView
-import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.chumian.miansecurity.R
+import com.chumian.miansecurity.core.ShizukuHelper
 import com.chumian.miansecurity.databinding.ActivityAppManagerBinding
-import com.chumian.miansecurity.emergency.ProcessManager
-import com.chumian.miansecurity.model.AppInfo
-import com.chumian.miansecurity.util.FormatUtil
+import com.chumian.miansecurity.model.AppScanResult
+import com.chumian.miansecurity.ui.adapter.AppListAdapter
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class AppManagerActivity : AppCompatActivity() {
     private lateinit var binding: ActivityAppManagerBinding
-    private val allApps = mutableListOf<AppInfo>()
-    private val filteredApps = mutableListOf<AppInfo>()
-    private lateinit var adapter: AppAdapter
-    private var filterType = "all"
+    private val scope = CoroutineScope(Dispatchers.Main)
+    private var apps: List<AppScanResult> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityAppManagerBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        setupToolbar()
-        setupRecyclerView()
-        loadApps()
-    }
-
-    private fun setupToolbar() {
-        binding.toolbar.title = getString(R.string.app_manager)
+        binding.toolbar.title = "应用管理"
         setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
         binding.toolbar.setNavigationOnClickListener { finish() }
-    }
 
-    private fun setupRecyclerView() {
-        adapter = AppAdapter(filteredApps) { app, action ->
-            handleAppAction(app, action)
-        }
         binding.recyclerView.layoutManager = LinearLayoutManager(this)
-        binding.recyclerView.adapter = adapter
+        loadApps()
     }
 
     private fun loadApps() {
         binding.progressBar.visibility = android.view.View.VISIBLE
-        lifecycleScope.launch {
-            val apps = withContext(Dispatchers.IO) {
-                ProcessManager.getInstalledApps(this@AppManagerActivity)
+        scope.launch {
+            apps = withContext(Dispatchers.IO) {
+                val pm = packageManager
+                val packages = pm.getInstalledPackages(android.content.pm.PackageManager.GET_PERMISSIONS)
+                packages.map { pkg ->
+                    val appName = try {
+                        pm.getApplicationLabel(pm.getApplicationInfo(pkg.packageName, 0)).toString()
+                    } catch (e: Exception) { pkg.packageName }
+                    val isSystem = try {
+                        val ai = pm.getApplicationInfo(pkg.packageName, 0)
+                        (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                    } catch (e: Exception) { false }
+                    AppScanResult(
+                        packageName = pkg.packageName,
+                        appName = appName,
+                        versionName = pkg.versionName ?: "",
+                        isSystemApp = isSystem,
+                        isDangerous = false,
+                        dangerousPermissions = emptyList(),
+                        allPermissions = pkg.requestedPermissions?.toList() ?: emptyList(),
+                        installTime = pkg.firstInstallTime,
+                        sourceDir = ""
+                    )
+                }.sortedBy { it.appName }
             }
-            allApps.clear()
-            allApps.addAll(apps)
-            applyFilter()
             binding.progressBar.visibility = android.view.View.GONE
-            binding.tvCount.text = "共 ${filteredApps.size} 个应用"
+            binding.tvCount.text = "共 ${apps.size} 个应用"
+            val adapter = AppListAdapter(
+                onAppClick = { app -> showAppDetail(app) },
+                onUninstall = { app -> showAppMenu(app) }
+            )
+            binding.recyclerView.adapter = adapter
+            adapter.submitList(apps)
         }
     }
 
-    private fun applyFilter() {
-        filteredApps.clear()
-        filteredApps.addAll(when (filterType) {
-            "user" -> allApps.filter { !it.isSystemApp }
-            "system" -> allApps.filter { it.isSystemApp }
-            "running" -> allApps.filter { it.isRunning }
-            "frozen" -> allApps.filter { it.isFrozen }
-            else -> allApps
-        })
-        adapter.notifyDataSetChanged()
-        binding.tvCount.text = "共 ${filteredApps.size} 个应用"
-    }
-
-    private fun handleAppAction(app: AppInfo, action: String) {
-        when (action) {
-            "uninstall" -> {
-                AlertDialog.Builder(this)
-                    .setTitle(R.string.uninstall)
-                    .setMessage("确定卸载 ${app.appName}？")
-                    .setPositiveButton(R.string.confirm) { _, _ ->
-                        if (ProcessManager.uninstallApp(this, app.packageName)) {
-                            Toast.makeText(this, "卸载成功", Toast.LENGTH_SHORT).show()
-                            loadApps()
-                        } else {
-                            val intent = Intent(Intent.ACTION_DELETE)
-                            intent.data = Uri.parse("package:${app.packageName}")
-                            startActivity(intent)
-                        }
-                    }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
-            }
-            "freeze" -> {
-                if (app.isFrozen) {
-                    if (ProcessManager.unfreezeApp(this, app.packageName)) {
-                        Toast.makeText(this, "已解冻", Toast.LENGTH_SHORT).show()
-                        loadApps()
-                    }
-                } else {
-                    if (ProcessManager.freezeApp(this, app.packageName)) {
-                        Toast.makeText(this, "已冻结", Toast.LENGTH_SHORT).show()
-                        loadApps()
-                    } else {
-                        Toast.makeText(this, "需要Shizuku或Root权限", Toast.LENGTH_SHORT).show()
-                    }
-                }
-            }
-            "info" -> {
+    private fun showAppDetail(app: AppScanResult) {
+        val perms = app.allPermissions.joinToString("\n") { "• $it" }
+        AlertDialog.Builder(this)
+            .setTitle(app.appName)
+            .setMessage("包名：${app.packageName}\n版本：${app.versionName}\n系统应用：${if (app.isSystemApp) "是" else "否"}\n权限数：${app.allPermissions.size}\n\n权限列表：\n$perms")
+            .setPositiveButton("应用信息") { _, _ ->
                 val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                 intent.data = Uri.parse("package:${app.packageName}")
                 startActivity(intent)
             }
-            "permissions" -> {
-                showAppPermissions(app)
-            }
-        }
-    }
-
-    private fun showAppPermissions(app: AppInfo) {
-        val perms = app.permissions.joinToString("\n") { "• $it" }
-        AlertDialog.Builder(this)
-            .setTitle("${app.appName} 权限")
-            .setMessage(if (perms.isEmpty()) "无权限" else perms)
-            .setPositiveButton(R.string.confirm, null)
+            .setNegativeButton("关闭", null)
             .show()
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.app_manager_menu, menu)
-        val searchItem = menu.findItem(R.id.action_search)
-        val searchView = searchItem.actionView as SearchView
-        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
-            override fun onQueryTextSubmit(query: String?) = false
-            override fun onQueryTextChange(newText: String?): Boolean {
-                val query = newText?.lowercase() ?: ""
-                filteredApps.clear()
-                filteredApps.addAll(allApps.filter {
-                    it.appName.lowercase().contains(query) || it.packageName.lowercase().contains(query)
-                })
-                adapter.notifyDataSetChanged()
-                return true
+    private fun showAppMenu(app: AppScanResult) {
+        val options = arrayOf("卸载", if (isFrozen(app.packageName)) "解冻" else "冻结", "应用信息")
+        AlertDialog.Builder(this)
+            .setTitle(app.appName)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> uninstallApp(app)
+                    1 -> toggleFreeze(app)
+                    2 -> {
+                        val intent = Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        intent.data = Uri.parse("package:${app.packageName}")
+                        startActivity(intent)
+                    }
+                }
             }
-        })
-        return true
+            .show()
     }
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        filterType = when (item.itemId) {
-            R.id.filter_all -> "all"
-            R.id.filter_user -> "user"
-            R.id.filter_system -> "system"
-            R.id.filter_running -> "running"
-            R.id.filter_frozen -> "frozen"
-            else -> return super.onOptionsItemSelected(item)
+    private fun uninstallApp(app: AppScanResult) {
+        AlertDialog.Builder(this)
+            .setTitle("确认卸载")
+            .setMessage("确定要卸载 ${app.appName} 吗？")
+            .setPositiveButton("卸载") { _, _ ->
+                if (ShizukuHelper.uninstallApp(app.packageName)) {
+                    Toast.makeText(this, "已卸载", Toast.LENGTH_SHORT).show()
+                    loadApps()
+                } else {
+                    Toast.makeText(this, "卸载失败", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun toggleFreeze(app: AppScanResult) {
+        if (isFrozen(app.packageName)) {
+            if (ShizukuHelper.unfreezeApp(app.packageName)) {
+                Toast.makeText(this, "已解冻", Toast.LENGTH_SHORT).show()
+            }
+        } else {
+            if (ShizukuHelper.freezeApp(app.packageName)) {
+                Toast.makeText(this, "已冻结", Toast.LENGTH_SHORT).show()
+            }
         }
-        applyFilter()
-        return true
+    }
+
+    private fun isFrozen(pkg: String): Boolean {
+        return try {
+            val state = packageManager.getApplicationEnabledSetting(pkg)
+            state != android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_ENABLED &&
+                    state != android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT
+        } catch (e: Exception) { false }
     }
 }
