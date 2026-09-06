@@ -8,6 +8,10 @@ import rikka.shizuku.ShizukuProvider
 object ShizukuHelper {
     private const val REQUEST_CODE = 1001
 
+    private fun newProcess(cmd: Array<String>): Process {
+        return Shizuku.newProcess(cmd, null)
+    }
+
     fun isInstalled(context: Context): Boolean {
         return try {
             context.packageManager.getPackageInfo("moe.shizuku.privileged.api", 0)
@@ -48,7 +52,7 @@ object ShizukuHelper {
     fun killProcess(packageName: String): Boolean {
         return try {
             if (!isAvailable() || !isGranted()) return false
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", "am force-stop $packageName"))
+            val process = newProcess(arrayOf("sh", "-c", "am force-stop $packageName"))
             process.waitFor() == 0
         } catch (e: Exception) {
             false
@@ -58,7 +62,7 @@ object ShizukuHelper {
     fun killProcessByPid(pid: Int): Boolean {
         return try {
             if (!isAvailable() || !isGranted()) return false
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", "kill -9 $pid"))
+            val process = newProcess(arrayOf("sh", "-c", "kill -9 $pid"))
             process.waitFor() == 0
         } catch (e: Exception) {
             false
@@ -68,7 +72,7 @@ object ShizukuHelper {
     fun uninstallApp(packageName: String): Boolean {
         return try {
             if (!isAvailable() || !isGranted()) return false
-            val process = Shizuku.newProcess(
+            val process = newProcess(
                 arrayOf("sh", "-c", "pm uninstall --user 0 $packageName")
             )
             val result = process.inputStream.bufferedReader().readText()
@@ -82,7 +86,7 @@ object ShizukuHelper {
     fun freezeApp(packageName: String): Boolean {
         return try {
             if (!isAvailable() || !isGranted()) return false
-            val process = Shizuku.newProcess(
+            val process = newProcess(
                 arrayOf("sh", "-c", "pm disable-user --user 0 $packageName")
             )
             process.waitFor() == 0
@@ -94,7 +98,7 @@ object ShizukuHelper {
     fun unfreezeApp(packageName: String): Boolean {
         return try {
             if (!isAvailable() || !isGranted()) return false
-            val process = Shizuku.newProcess(
+            val process = newProcess(
                 arrayOf("sh", "-c", "pm enable $packageName")
             )
             process.waitFor() == 0
@@ -106,7 +110,7 @@ object ShizukuHelper {
     fun clearCache(packageName: String): Boolean {
         return try {
             if (!isAvailable() || !isGranted()) return false
-            val process = Shizuku.newProcess(
+            val process = newProcess(
                 arrayOf("sh", "-c", "pm trim-caches 999999999999")
             )
             process.waitFor() == 0
@@ -118,7 +122,7 @@ object ShizukuHelper {
     fun runCommand(command: String): String {
         return try {
             if (!isAvailable() || !isGranted()) return ""
-            val process = Shizuku.newProcess(arrayOf("sh", "-c", command))
+            val process = newProcess(arrayOf("sh", "-c", command))
             val output = process.inputStream.bufferedReader().readText()
             val error = process.errorStream.bufferedReader().readText()
             process.waitFor()

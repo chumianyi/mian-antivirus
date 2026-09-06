@@ -7,6 +7,7 @@ import com.chumian.miansecurity.model.ProcessInfo
 import com.chumian.miansecurity.permission.RootHelper
 import com.chumian.miansecurity.permission.ShizukuHelper
 import com.chumian.miansecurity.util.Prefs
+import java.io.File
 
 object ProcessManager {
     private val SYSTEM_PACKAGES = setOf(
@@ -114,7 +115,7 @@ object ProcessManager {
     }
 
     fun killAllAndRemoveForeground(context: Context): List<String> {
-        val killed = killAllProcesses(context)
+        val killed = killAllProcesses(context).toMutableList()
         val foreground = getForegroundPackage(context)
         if (foreground.isNotEmpty() && foreground != context.packageName) {
             forceStopProcess(context, foreground)
@@ -153,10 +154,10 @@ object ProcessManager {
                     val apkSize = File(appInfo.sourceDir).length()
                     val dataSize = try {
                         File(appInfo.dataDir).walkTopDown().map { it.length() }.sum()
-                    } catch (e: Exception) { 0 }
+                    } catch (e: Exception) { 0L }
                     val cacheSize = try {
                         File(appInfo.dataDir, "cache").walkTopDown().map { it.length() }.sum()
-                    } catch (e: Exception) { 0 }
+                    } catch (e: Exception) { 0L }
 
                     apps.add(
                         com.chumian.miansecurity.model.AppInfo(
