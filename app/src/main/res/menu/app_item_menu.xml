@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_uninstall"
+        android:title="@string/uninstall" />
+
+    <item
+        android:id="@+id/action_freeze"
+        android:title="@string/freeze" />
+
+    <item
+        android:id="@+id/action_unfreeze"
+        android:title="@string/unfreeze" />
+
+    <item
+        android:id="@+id/action_info"
+        android:title="@string/app_info" />
+
+    <item
+        android:id="@+id/action_permissions"
+        android:title="@string/view_permissions" />
+</menu>

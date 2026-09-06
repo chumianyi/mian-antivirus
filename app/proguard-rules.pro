@@ -1,0 +1,4 @@
+-keepattributes *Annotation*
+-keep class com.chumian.miansecurity.** { *; }
+-dontwarn dev.rikka.shizuku.**
+-keep class dev.rikka.shizuku.** { *; }
