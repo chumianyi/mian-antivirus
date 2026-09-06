@@ -36,7 +36,7 @@ class PermissionAppAdapter(
                 "SYSTEM_ALERT_WINDOW", "INSTALL_PACKAGES"
             ).any { perm.contains(it, ignoreCase = true) }
         }
-        holder.binding.tvDangerCount.text = "$dangerousCount 项危险权限"
+        holder.binding.tvPermissions.text = "$dangerousCount 项危险权限 / 共 ${app.permissions.size} 项"
 
         holder.binding.root.setOnClickListener {
             val perms = app.permissions.joinToString("\n") { "• $it" }

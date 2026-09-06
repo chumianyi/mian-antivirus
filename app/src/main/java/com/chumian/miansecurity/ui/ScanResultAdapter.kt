@@ -26,13 +26,12 @@ class ScanResultAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val result = results[position]
         holder.binding.tvFileName.text = result.fileName
-        holder.binding.tvFilePath.text = FormatUtil.truncatePath(result.filePath)
+        holder.binding.tvFilePath.text = "${FormatUtil.truncatePath(result.filePath)} (${FormatUtil.formatFileSize(result.fileSize)})"
         holder.binding.tvVirusType.text = result.virusType
         holder.binding.tvRiskLevel.text = result.riskLevel
         holder.binding.tvRiskLevel.setTextColor(Color.parseColor(FormatUtil.getRiskColor(result.riskLevel)))
-        holder.binding.tvFileSize.text = FormatUtil.formatFileSize(result.fileSize)
-        holder.binding.checkbox.isChecked = result.isSelected
-        holder.binding.checkbox.setOnCheckedChangeListener { _, isChecked ->
+        holder.binding.checkBox.isChecked = result.isSelected
+        holder.binding.checkBox.setOnCheckedChangeListener { _, isChecked ->
             onCheckedChange(holder.adapterPosition, isChecked)
         }
     }

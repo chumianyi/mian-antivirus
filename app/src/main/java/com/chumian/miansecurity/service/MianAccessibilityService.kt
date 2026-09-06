@@ -48,7 +48,7 @@ class MianAccessibilityService : AccessibilityService() {
         }
     }
 
-    override fun performGlobalAction(action: Int): Boolean {
+    fun performGlobalActionSafe(action: Int): Boolean {
         return try {
             super.performGlobalAction(action)
         } catch (e: Exception) {

@@ -22,15 +22,16 @@ class KilledProcessAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val pkg = processes[position]
-        holder.binding.tvPackageName.text = pkg
+        holder.binding.tvProcessName.text = pkg
+        holder.binding.tvPid.text = "PID: -"
         try {
             val pm = holder.binding.root.context.packageManager
             val appInfo = pm.getApplicationInfo(pkg, 0)
             val appName = pm.getApplicationLabel(appInfo).toString()
-            holder.binding.tvAppName.text = appName
-            holder.binding.ivIcon.setImageDrawable(pm.getApplicationIcon(appInfo))
+            holder.binding.tvProcessName.text = "$appName ($pkg)"
+            holder.binding.tvStatus.text = "已禁止"
         } catch (e: PackageManager.NameNotFoundException) {
-            holder.binding.tvAppName.text = pkg
+            holder.binding.tvStatus.text = "已禁止"
         }
     }
 

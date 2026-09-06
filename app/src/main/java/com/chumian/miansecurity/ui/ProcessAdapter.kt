@@ -1,8 +1,6 @@
 package com.chumian.miansecurity.ui
 
-import android.content.pm.PackageManager
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import com.chumian.miansecurity.databinding.ItemProcessBinding
@@ -26,19 +24,10 @@ class ProcessAdapter(
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val proc = processes[position]
-        holder.binding.tvProcessName.text = proc.processName
+        val systemTag = if (proc.isSystem) " [系统]" else ""
+        holder.binding.tvProcessName.text = "${proc.processName}$systemTag"
         holder.binding.tvPid.text = "PID: ${proc.pid}"
         holder.binding.tvMemory.text = FormatUtil.formatFileSize(proc.memorySize)
-        holder.binding.ivSystem.visibility = if (proc.isSystem) View.VISIBLE else View.GONE
-
-        try {
-            val pm = holder.binding.root.context.packageManager
-            val appInfo = pm.getApplicationInfo(proc.packageName, 0)
-            holder.binding.ivIcon.setImageDrawable(pm.getApplicationIcon(appInfo))
-        } catch (e: PackageManager.NameNotFoundException) {
-            // Use default icon
-        }
-
         holder.binding.btnKill.setOnClickListener { onKill(proc) }
     }
 
