@@ -65,7 +65,7 @@ interface TrafficLogDao {
     @Query("SELECT * FROM traffic_log WHERE date = :date ORDER BY (uploadBytes + downloadBytes) DESC")
     fun getByDate(date: String): Flow<List<TrafficLogEntity>>
 
-    @Query("SELECT packageName, appName, SUM(uploadBytes) as uploadBytes, SUM(downloadBytes) as downloadBytes FROM traffic_log WHERE timestamp >= :since GROUP BY packageName ORDER BY (SUM(uploadBytes) + SUM(downloadBytes)) DESC")
+    @Query("SELECT * FROM traffic_log WHERE timestamp >= :since ORDER BY (uploadBytes + downloadBytes) DESC")
     fun getSince(since: Long): Flow<List<TrafficLogEntity>>
 
     @Query("SELECT SUM(uploadBytes + downloadBytes) FROM traffic_log WHERE date = :date")
@@ -80,7 +80,7 @@ interface BatteryLogDao {
     @Query("SELECT * FROM battery_log WHERE date = :date ORDER BY batteryPercent DESC")
     fun getByDate(date: String): Flow<List<BatteryLogEntity>>
 
-    @Query("SELECT packageName, appName, SUM(batteryPercent) as batteryPercent, SUM(foregroundTimeMs) as foregroundTimeMs FROM battery_log WHERE timestamp >= :since GROUP BY packageName ORDER BY batteryPercent DESC")
+    @Query("SELECT * FROM battery_log WHERE timestamp >= :since ORDER BY batteryPercent DESC")
     fun getSince(since: Long): Flow<List<BatteryLogEntity>>
 }
 
