@@ -71,6 +71,57 @@
         <activity
             android:name=".ui.CacheCleanActivity"
             android:exported="false" />
+        <activity
+            android:name=".ui.ToolboxActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.TrafficMonitorActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.BatteryMonitorActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.WifiCheckActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.AppLockActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.PrivacyVaultActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.LinkCheckerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.NotificationManagerActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.DeviceInfoActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ApkExtractorActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.AdBlockActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.LicenseActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.FeedbackActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.SensorTestActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.ScreenTestActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.DnsSwitchActivity"
+            android:exported="false" />
+        <activity
+            android:name=".ui.SpeedTestActivity"
+            android:exported="false" />
 
         <service
             android:name=".service.ProtectService"

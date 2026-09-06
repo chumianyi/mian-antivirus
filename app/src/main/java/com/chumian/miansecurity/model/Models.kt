@@ -17,7 +17,10 @@ data class ProcessInfo(
     val processName: String,
     val packageName: String,
     val memorySize: Long,
-    val isSystem: Boolean
+    val cpuPercent: Float,
+    val isSystem: Boolean,
+    val user: String,
+    val state: String
 )
 
 data class UpdateInfo(

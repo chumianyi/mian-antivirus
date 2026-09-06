@@ -90,6 +90,15 @@ class HomeFragment : Fragment() {
         binding.cardCacheClean.setOnClickListener {
             startActivity(Intent(requireContext(), CacheCleanActivity::class.java))
         }
+        binding.cardToolbox.setOnClickListener {
+            startActivity(Intent(requireContext(), ToolboxActivity::class.java))
+        }
+        binding.cardDeviceInfo.setOnClickListener {
+            startActivity(Intent(requireContext(), DeviceInfoActivity::class.java))
+        }
+        binding.cardLinkChecker.setOnClickListener {
+            startActivity(Intent(requireContext(), LinkCheckerActivity::class.java))
+        }
         binding.btnQuickScan.setOnClickListener {
             (activity as? MainActivity)?.switchToScanTab()
         }
